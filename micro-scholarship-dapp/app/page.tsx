@@ -1,36 +1,53 @@
 "use client";
 
 import { useState } from "react";
-import WalletConnect from "./components/WalletConnect";
+import { createTestAccount } from "../lib/stellar";
 import GMButton from "./components/GMButton";
-import "./globals.css";
 
 export default function Home() {
   const [logs, setLogs] = useState<string[]>([]);
+  const [secretKey, setSecretKey] = useState("");
+  const [publicKey, setPublicKey] = useState("");
 
   const addLog = (message: string) => {
     setLogs((prev) => [...prev, message]);
   };
 
+  const handleCreateWallet = async () => {
+    try {
+      addLog("⏳ Creating Stellar test account...");
+
+      const pair = await createTestAccount();
+
+      setSecretKey(pair.secret());
+      setPublicKey(pair.publicKey());
+
+      addLog("✅ Account created!");
+      addLog("Public Key: " + pair.publicKey());
+    } catch {
+      addLog("❌ Wallet creation failed");
+    }
+  };
+
   return (
     <main className="container">
-      <h1 className="title">🎓 Micro Scholarship DApp</h1>
+      <h1 className="title">Micro Scholarship DApp</h1>
 
-      <div className="card">
-        <WalletConnect addLog={addLog} />
-      </div>
+      <button className="button primary" onClick={handleCreateWallet}>
+        Create Test Wallet
+      </button>
 
-      <div className="card">
-        <GMButton addLog={addLog} />
-      </div>
+      {secretKey && publicKey && (
+        <GMButton
+          addLog={addLog}
+          secretKey={secretKey}
+          publicKey={publicKey}
+        />
+      )}
 
-      <div className="card log-card">
-        <h3>Activity Log</h3>
-        {logs.length === 0 && <p>No activity yet...</p>}
+      <div className="log-box">
         {logs.map((log, index) => (
-          <p key={index} className="log-item">
-            {log}
-          </p>
+          <p key={index}>{log}</p>
         ))}
       </div>
     </main>

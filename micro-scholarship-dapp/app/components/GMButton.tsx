@@ -1,27 +1,34 @@
 "use client";
 
+import { sendXLM } from "../../lib/stellar";
+
 type Props = {
   addLog: (message: string) => void;
+  secretKey: string;
+  publicKey: string;
 };
 
-export default function GMButton({ addLog }: Props) {
-  const handleGM = () => {
-    addLog("🚀 GM sent!");
-  };
+export default function GMButton({
+  addLog,
+  secretKey,
+  publicKey,
+}: Props) {
+  const handleGM = async () => {
+    try {
+      addLog("⏳ Sending 1 XLM to yourself...");
 
-  const handleGN = () => {
-    addLog("🌙 GN sent!");
+      const hash = await sendXLM(secretKey, publicKey, "1");
+
+      addLog("✅ Transaction Success!");
+      addLog("TX Hash: " + hash);
+    } catch {
+      addLog("❌ Transaction failed");
+    }
   };
 
   return (
-    <div className="gm-container">
-      <button className="button success" onClick={handleGM}>
-        Send GM
-      </button>
-
-      <button className="button danger" onClick={handleGN}>
-        Send GN
-      </button>
-    </div>
+    <button className="button success" onClick={handleGM}>
+      Send 1 XLM (GM)
+    </button>
   );
 }

@@ -1,18 +1,38 @@
-import { Keypair, Networks, TransactionBuilder, Operation, Asset, Horizon } from "@stellar/stellar-sdk";
+import {
+  Keypair,
+  Horizon,
+  Networks,
+  TransactionBuilder,
+  Operation,
+  Asset,
+} from "@stellar/stellar-sdk";
 
 const server = new Horizon.Server("https://horizon-testnet.stellar.org");
 
-export async function fundAccount(publicKey: string) {
-  await fetch(`https://friendbot.stellar.org?addr=${publicKey}`);
+// Testnet hesap oluştur (Friendbot)
+export async function createTestAccount() {
+  const pair = Keypair.random();
+
+  const response = await fetch(
+    `https://friendbot.stellar.org?addr=${pair.publicKey()}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Friendbot failed");
+  }
+
+  return pair;
 }
 
-export async function sendScholarship(
-  senderSecret: string,
-  recipientPublic: string,
+// XLM transfer fonksiyonu
+export async function sendXLM(
+  sourceSecret: string,
+  destination: string,
   amount: string
 ) {
-  const senderKeypair = Keypair.fromSecret(senderSecret);
-  const account = await server.loadAccount(senderKeypair.publicKey());
+  const sourceKeypair = Keypair.fromSecret(sourceSecret);
+
+  const account = await server.loadAccount(sourceKeypair.publicKey());
 
   const transaction = new TransactionBuilder(account, {
     fee: "100",
@@ -20,14 +40,17 @@ export async function sendScholarship(
   })
     .addOperation(
       Operation.payment({
-        destination: recipientPublic,
+        destination,
         asset: Asset.native(),
-        amount: amount,
+        amount,
       })
     )
     .setTimeout(30)
     .build();
 
-  transaction.sign(senderKeypair);
-  return await server.submitTransaction(transaction);
+  transaction.sign(sourceKeypair);
+
+  const result = await server.submitTransaction(transaction);
+
+  return result.hash;
 }
