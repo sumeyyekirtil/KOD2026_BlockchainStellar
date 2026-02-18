@@ -1,93 +1,135 @@
 #![no_std]
 
 use soroban_sdk::{
-    contractimpl, contracterror, Env, BytesN, Address, panic_with_error,
+    contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Vec,
 };
 
-pub const USER_GM_PREFIX: &[u8] = b"user_gm_";
-pub const USER_GN_PREFIX: &[u8] = b"user_gn_";
-pub const TOTAL_GM_KEY: &[u8] = b"total_gm";
-pub const TOTAL_GN_KEY: &[u8] = b"total_gn";
-pub const ADMIN_KEY: &[u8] = b"admin";
+#[contract]
+pub struct ScholarshipContract;
 
-#[contracterror]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ContractError {
-    NotAuthorized,
-    NotInitialized,
+#[contracttype]
+#[derive(Clone)]
+pub struct Application {
+    pub applicant: Address,
+    pub description: Symbol,
+    pub approved: bool,
 }
 
-pub struct GmGnCounter;
+#[contracttype]
+pub enum DataKey {
+    Application(Address),
+    GMCount,
+    GNCount,
+    Admin,
+}
 
 #[contractimpl]
-impl GmGnCounter {
-    // Initialize admin and total counters
-    pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
-        let storage = env.storage().persistent();
-        if storage.has(&ADMIN_KEY.into()) {
-            panic_with_error!(&env, ContractError::NotInitialized);
-        }
-        storage.set(&ADMIN_KEY.into(), &admin);
-        storage.set(&TOTAL_GM_KEY.into(), &0u64);
-        storage.set(&TOTAL_GN_KEY.into(), &0u64);
-        Ok(())
+impl ScholarshipContract {
+
+    // ------------------------
+    // INIT (Admin set)
+    // ------------------------
+    pub fn initialize(env: Env, admin: Address) {
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Admin, &admin);
     }
 
-    // Increment GM counter
-    pub fn gm(env: Env, user: Address) -> Result<(), ContractError> {
-        let storage = env.storage().persistent();
-        let mut total_gm: u64 = storage.get(&TOTAL_GM_KEY.into()).unwrap_or(Ok(0)).unwrap();
-        total_gm += 1;
-        storage.set(&TOTAL_GM_KEY.into(), &total_gm);
+    // ------------------------
+    // APPLY FOR SCHOLARSHIP
+    // ------------------------
+    pub fn apply_scholarship(env: Env, applicant: Address, description: Symbol) {
+        applicant.require_auth();
 
-        let mut user_gm_key = BytesN::from_array(&env, &[
-            USER_GM_PREFIX,
-            &user.to_bytes(&env)
-        ].concat());
-        let mut user_gm: u64 = storage.get(&user_gm_key).unwrap_or(Ok(0)).unwrap();
-        user_gm += 1;
-        storage.set(&user_gm_key, &user_gm);
+        let app = Application {
+            applicant: applicant.clone(),
+            description,
+            approved: false,
+        };
 
-        Ok(())
+        env.storage()
+            .instance()
+            .set(&DataKey::Application(applicant), &app);
     }
 
-    // Increment GN counter
-    pub fn gn(env: Env, user: Address) -> Result<(), ContractError> {
-        let storage = env.storage().persistent();
-        let mut total_gn: u64 = storage.get(&TOTAL_GN_KEY.into()).unwrap_or(Ok(0)).unwrap();
-        total_gn += 1;
-        storage.set(&TOTAL_GN_KEY.into(), &total_gn);
+    // ------------------------
+    // APPROVE SCHOLARSHIP
+    // ------------------------
+    pub fn approve_scholarship(env: Env, applicant: Address) {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .unwrap();
 
-        let mut user_gn_key = BytesN::from_array(&env, &[
-            USER_GN_PREFIX,
-            &user.to_bytes(&env)
-        ].concat());
-        let mut user_gn: u64 = storage.get(&user_gn_key).unwrap_or(Ok(0)).unwrap();
-        user_gn += 1;
-        storage.set(&user_gn_key, &user_gn);
+        admin.require_auth();
 
-        Ok(())
+        let mut app: Application = env
+            .storage()
+            .instance()
+            .get(&DataKey::Application(applicant.clone()))
+            .unwrap();
+
+        app.approved = true;
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Application(applicant), &app);
     }
 
-    // Read total counters
-    pub fn get_stats(env: Env, user: Address) -> Result<(u64, u64, u64, u64), ContractError> {
-        let storage = env.storage().persistent();
+    // ------------------------
+    // SAY GM
+    // ------------------------
+    pub fn say_gm(env: Env) {
+        let mut count: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::GMCount)
+            .unwrap_or(0);
 
-        let total_gm: u64 = storage.get(&TOTAL_GM_KEY.into()).ok_or(ContractError::NotInitialized)?;
-        let total_gn: u64 = storage.get(&TOTAL_GN_KEY.into()).ok_or(ContractError::NotInitialized)?;
+        count += 1;
 
-        let user_gm_key = BytesN::from_array(&env, &[
-            USER_GM_PREFIX,
-            &user.to_bytes(&env)
-        ].concat());
-        let user_gn_key = BytesN::from_array(&env, &[
-            USER_GN_PREFIX,
-            &user.to_bytes(&env)
-        ].concat());
+        env.storage()
+            .instance()
+            .set(&DataKey::GMCount, &count);
+    }
 
-        let user_gm: u64 = storage.get(&user_gm_key).unwrap_or(Ok(0)).unwrap();
-        let user_gn: u64 = storage.get(&user_gn_key).unwrap_or(Ok(0)).unwrap();
+    // ------------------------
+    // SAY GN
+    // ------------------------
+    pub fn say_gn(env: Env) {
+        let mut count: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::GNCount)
+            .unwrap_or(0);
 
-        Ok((total_gm, total_gn, user_gm, user_gn))
+        count += 1;
+
+        env.storage()
+            .instance()
+            .set(&DataKey::GNCount, &count);
+    }
+
+    // ------------------------
+    // GETTERS
+    // ------------------------
+    pub fn get_gm_count(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::GMCount)
+            .unwrap_or(0)
+    }
+
+    pub fn get_gn_count(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::GNCount)
+            .unwrap_or(0)
+    }
+
+    pub fn get_application(env: Env, applicant: Address) -> Option<Application> {
+        env.storage()
+            .instance()
+            .get(&DataKey::Application(applicant))
     }
 }

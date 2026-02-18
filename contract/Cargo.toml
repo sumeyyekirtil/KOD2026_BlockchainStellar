@@ -1,5 +1,5 @@
 [package]
-name = "gm_gn_counter"
+name = "scholarship-contract"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,7 +14,6 @@ opt-level = "z"
 overflow-checks = true
 debug = 0
 strip = "symbols"
-debug-assertions = false
 panic = "abort"
 codegen-units = 1
 lto = true
